@@ -1,4 +1,5 @@
 <!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
+
 - [x] Verify that the copilot-instructions.md file in the .github directory is created.
 
 - [x] Clarify Project Requirements: TypeScript MCP Server for cloud storage with multi-backend support (S3, Qiniu, Alibaba Cloud)
@@ -17,30 +18,20 @@
 
 - [x] Ensure Documentation is Complete: README.md, configuration examples, and copilot instructions completed
 
-- [ ] Compile the Project
-	<!--
-	Verify that all previous steps have been completed.
-	Install any missing dependencies.
-	Run diagnostics and resolve any issues.
-	Check for markdown files in project folder for relevant instructions on how to do this.
-	-->
+## Project Optimizations Completed
 
-- [ ] Create and Run Task
-	<!--
-	Verify that all previous steps have been completed.
-	Check https://code.visualstudio.com/docs/debugtest/tasks to determine if the project needs a task. If so, use the create_and_run_task to create and launch a task based on package.json, README.md, and project structure.
-	Skip this step otherwise.
-	 -->
+- [x] **AWS SDK v3 Migration**: Upgraded from AWS SDK v2 to v3 for better performance and smaller bundle size
+- [x] **HTTP Transport**: Migrated from StdioServerTransport to StreamableHTTPServerTransport for better scalability
+- [x] **Stateless Operation**: Removed session management for horizontal scaling support
+- [x] **Integrated Download URLs**: Removed separate get_download_url tool and integrated functionality into upload_file tool
+- [x] **Modern Architecture**: Server now uses HTTP transport with stateless design for better performance and scalability
 
-- [ ] Launch the Project
-	<!--
-	Verify that all previous steps have been completed.
-	Prompt user for debug mode, launch only if confirmed.
-	 -->
+## Key Features
 
-- [ ] Ensure Documentation is Complete
-	<!--
-	Verify that all previous steps have been completed.
-	Verify that README.md and the copilot-instructions.md file in the .github directory exists and contains current project information.
-	Clean up the copilot-instructions.md file in the .github directory by removing all HTML comments.
-	 -->
+- Multi-backend cloud storage support (AWS S3, Qiniu, Alibaba Cloud OSS)
+- AWS SDK v3 for improved performance
+- HTTP-based MCP server with stateless architecture
+- Integrated file upload with optional signed download URL generation
+- TypeScript with full type safety
+- Comprehensive error handling and validation
+- Production-ready configuration management

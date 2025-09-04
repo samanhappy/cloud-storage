@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { createServer } from 'node:http';
 import { z } from 'zod';
 import { ConfigManager } from './config/index.js';
 import { CloudStorageService } from './services/cloud-storage.js';
@@ -12,75 +13,88 @@ const UploadFileInputSchema = {
   filename: z.string().describe('Name of the file to upload'),
   contentType: z.string().optional().describe('MIME type of the file (optional, will be auto-detected)'),
   metadata: z.record(z.string()).optional().describe('Additional metadata for the file'),
+  generateDownloadUrl: z.boolean().optional().describe('Whether to generate a signed download URL (default: false)'),
+  downloadUrlExpiration: z.number().optional().describe('Download URL expiration time in seconds (default: 3600)'),
 };
 
 const DeleteFileInputSchema = {
   url: z.string().describe('URL of the file to delete'),
 };
 
-const GetDownloadUrlInputSchema = {
-  key: z.string().describe('Key/path of the file in storage'),
-  expirationTime: z.number().optional().describe('URL expiration time in seconds (default: 3600)'),
-};
-
 class CloudStorageMCPServer {
-  private server: McpServer;
-  private storageService: CloudStorageService | null = null;
   private configManager: ConfigManager;
 
   constructor() {
     this.configManager = new ConfigManager();
-    
-    this.server = new McpServer({
-      name: 'cloud-storage-mcp-server',
-      version: '1.0.0',
-    });
-
-    this.setupTools();
-    this.setupResources();
   }
 
-  private setupTools() {
-    // Upload file tool
-    this.server.registerTool(
+  private getStorageService(): CloudStorageService {
+    // Create a new instance each time (stateless)
+    const config = this.configManager.load();
+    return new CloudStorageService(config);
+  }
+
+  private setupTools(server: McpServer) {
+    // Upload file tool with integrated download URL generation
+    server.registerTool(
       'upload_file',
       {
         title: 'Upload File to Cloud Storage',
-        description: 'Upload a file to the configured cloud storage backend and return its accessible URL',
+        description: 'Upload a file to the configured cloud storage backend and return its accessible URL. Optionally generate a signed download URL.',
         inputSchema: UploadFileInputSchema,
       },
-      async ({ fileData, filename, contentType, metadata }: {
+      async ({ fileData, filename, contentType, metadata, generateDownloadUrl, downloadUrlExpiration }: {
         fileData: string;
         filename: string;
         contentType?: string;
         metadata?: Record<string, string>;
+        generateDownloadUrl?: boolean;
+        downloadUrlExpiration?: number;
       }) => {
         try {
-          if (!this.storageService) {
-            throw new Error('Cloud storage not configured. Please check your configuration.');
-          }
+          const storageService = this.getStorageService();
 
           // Decode base64 file data
           const fileBuffer = Buffer.from(fileData, 'base64');
           
           // Upload the file
-          const result = await this.storageService.uploadFile(fileBuffer, filename, {
+          const result = await storageService.uploadFile(fileBuffer, filename, {
             contentType,
             metadata,
           });
+
+          // Generate download URL if requested
+          let downloadUrl: string | undefined;
+          if (generateDownloadUrl && result.metadata?.key) {
+            try {
+              downloadUrl = await storageService.getDownloadUrl(
+                result.metadata.key, 
+                downloadUrlExpiration || 3600
+              );
+            } catch (error) {
+              console.warn('Failed to generate download URL:', error);
+            }
+          }
+
+          const response: any = {
+            success: true,
+            url: result.url,
+            filename: result.filename,
+            size: result.size,
+            contentType: result.contentType,
+            metadata: result.metadata,
+          };
+
+          if (downloadUrl) {
+            response.downloadUrl = downloadUrl;
+            response.downloadUrlExpiration = downloadUrlExpiration || 3600;
+          }
 
           return {
             content: [
               {
                 type: 'text',
-                text: JSON.stringify({
-                  success: true,
-                  url: result.url,
-                  filename: result.filename,
-                  size: result.size,
-                  contentType: result.contentType,
-                  metadata: result.metadata,
-                }, null, 2),
+                text: JSON.stringify(response, null, 2),
               },
             ],
           };
@@ -102,7 +116,7 @@ class CloudStorageMCPServer {
     );
 
     // Delete file tool
-    this.server.registerTool(
+    server.registerTool(
       'delete_file',
       {
         title: 'Delete File from Cloud Storage',
@@ -111,11 +125,8 @@ class CloudStorageMCPServer {
       },
       async ({ url }: { url: string }) => {
         try {
-          if (!this.storageService) {
-            throw new Error('Cloud storage not configured. Please check your configuration.');
-          }
-
-          await this.storageService.deleteFile(url);
+          const storageService = this.getStorageService();
+          await storageService.deleteFile(url);
 
           return {
             content: [
@@ -146,61 +157,11 @@ class CloudStorageMCPServer {
         }
       }
     );
-
-    // Get download URL tool
-    this.server.registerTool(
-      'get_download_url',
-      {
-        title: 'Generate Download URL',
-        description: 'Generate a signed download URL for a file in cloud storage',
-        inputSchema: GetDownloadUrlInputSchema,
-      },
-      async ({ key, expirationTime }: {
-        key: string;
-        expirationTime?: number;
-      }) => {
-        try {
-          if (!this.storageService) {
-            throw new Error('Cloud storage not configured. Please check your configuration.');
-          }
-
-          const url = await this.storageService.getDownloadUrl(key, expirationTime);
-
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify({
-                  success: true,
-                  downloadUrl: url,
-                  key,
-                  expirationTime: expirationTime || 3600,
-                }, null, 2),
-              },
-            ],
-          };
-        } catch (error) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify({
-                  success: false,
-                  error: error instanceof Error ? error.message : 'Unknown error',
-                  key,
-                }, null, 2),
-              },
-            ],
-            isError: true,
-          };
-        }
-      }
-    );
   }
 
-  private setupResources() {
+  private setupResources(server: McpServer) {
     // Storage configuration resource
-    this.server.registerResource(
+    server.registerResource(
       'storage-config',
       'storage://config',
       {
@@ -210,11 +171,12 @@ class CloudStorageMCPServer {
       },
       async () => {
         try {
-          const configSummary = this.storageService?.getConfigSummary() || { error: 'Not configured' };
-          const backendInfo = this.storageService?.getBackendInfo() || { error: 'Not configured' };
+          const storageService = this.getStorageService();
+          const configSummary = storageService.getConfigSummary();
+          const backendInfo = storageService.getBackendInfo();
 
           const status = {
-            configured: !!this.storageService,
+            configured: true,
             backend: backendInfo,
             config: configSummary,
             supportedBackends: ['aws-s3', 'qiniu', 'alibaba-oss'],
@@ -235,7 +197,9 @@ class CloudStorageMCPServer {
               {
                 uri: 'storage://config',
                 text: JSON.stringify({
+                  configured: false,
                   error: error instanceof Error ? error.message : 'Unknown error',
+                  supportedBackends: ['aws-s3', 'qiniu', 'alibaba-oss'],
                 }, null, 2),
                 mimeType: 'application/json',
               },
@@ -246,7 +210,7 @@ class CloudStorageMCPServer {
     );
 
     // Usage examples resource
-    this.server.registerResource(
+    server.registerResource(
       'usage-examples',
       'storage://examples',
       {
@@ -269,7 +233,9 @@ class CloudStorageMCPServer {
     "metadata": {
       "uploadedBy": "user123",
       "category": "profile-photo"
-    }
+    },
+    "generateDownloadUrl": true,
+    "downloadUrlExpiration": 3600
   }
 }
 \`\`\`
@@ -281,18 +247,6 @@ class CloudStorageMCPServer {
   "tool": "delete_file",
   "arguments": {
     "url": "https://your-bucket.s3.amazonaws.com/uploads/2024-01-01/uuid.jpg"
-  }
-}
-\`\`\`
-
-## Generate Download URL
-
-\`\`\`json
-{
-  "tool": "get_download_url",
-  "arguments": {
-    "key": "uploads/2024-01-01/uuid.jpg",
-    "expirationTime": 3600
   }
 }
 \`\`\`
@@ -342,31 +296,84 @@ export ALIBABA_OSS_REGION=oss-cn-beijing
     );
   }
 
-  private async initializeStorage() {
-    try {
-      const config = this.configManager.load();
-      this.storageService = new CloudStorageService(config);
-      console.error(`✅ Cloud storage initialized with ${config.backend.type} backend`);
-    } catch (error) {
-      console.error(`❌ Failed to initialize cloud storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      console.error('💡 Please check your configuration and try again.');
-    }
+  private createServer(): McpServer {
+    const server = new McpServer({
+      name: 'cloud-storage-mcp-server',
+      version: '1.0.0',
+    });
+
+    this.setupTools(server);
+    this.setupResources(server);
+    
+    return server;
   }
 
   async start() {
-    // Initialize storage configuration
-    await this.initializeStorage();
+    try {
+      // Test configuration on startup
+      this.getStorageService();
+      console.error('✅ Cloud storage configuration validated');
+    } catch (error) {
+      console.error(`❌ Configuration error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('💡 Please check your configuration and try again.');
+    }
 
-    // Start the MCP server
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
+    // Create server instance
+    const server = this.createServer();
+
+    // Create HTTP transport (stateless mode)
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined, // Stateless mode
+      enableJsonResponse: true,
+    });
     
-    console.error('🚀 Cloud Storage MCP Server started');
+    await server.connect(transport);
+
+    // Create HTTP server to handle requests
+    const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+    const httpServer = createServer((req, res) => {
+      // Enable CORS
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      
+      if (req.method === 'OPTIONS') {
+        res.writeHead(200);
+        res.end();
+        return;
+      }
+
+      // Handle MCP requests
+      if (req.method === 'POST') {
+        let body = '';
+        req.on('data', (chunk) => {
+          body += chunk.toString();
+        });
+        req.on('end', () => {
+          try {
+            const parsedBody = JSON.parse(body);
+            transport.handleRequest(req, res, parsedBody);
+          } catch (error) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid JSON' }));
+          }
+        });
+      } else {
+        transport.handleRequest(req, res);
+      }
+    });
+
+    httpServer.listen(port, () => {
+      console.error(`🚀 Cloud Storage MCP Server started on port ${port}`);
+      console.error(`📡 Server is running in stateless mode`);
+      console.error(`🔗 Connect to: http://localhost:${port}`);
+    });
   }
 }
 
 // Start the server
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {
+  console.error('Starting server...');
   const server = new CloudStorageMCPServer();
   server.start().catch((error) => {
     console.error('Failed to start server:', error);

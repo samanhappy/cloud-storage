@@ -4,15 +4,17 @@ A Model Context Protocol (MCP) server that provides file upload functionality wi
 
 ## Features
 
-- **Multi-backend Support**: AWS S3, Qiniu, and Alibaba Cloud OSS
+- **Multi-backend Support**: AWS S3 (v3 SDK), Qiniu, and Alibaba Cloud OSS
 - **File Validation**: Size limits, MIME type filtering, filename validation
 - **Flexible Configuration**: Environment variables or JSON config file
-- **MCP Tools**: Upload, delete, and generate download URLs for files
+- **HTTP Transport**: Streamable HTTP transport for better performance and scalability
+- **Stateless Operation**: No session management for better scalability
+- **Integrated Download URLs**: Generate signed download URLs directly from upload
 - **Type Safety**: Built with TypeScript and Zod validation
 
 ## Supported Storage Backends
 
-1. **Amazon S3** - Industry standard object storage
+1. **Amazon S3** - Industry standard object storage (using AWS SDK v3)
 2. **Qiniu Cloud Storage** - Popular Chinese cloud storage service
 3. **Alibaba Cloud OSS** - Alibaba's object storage service
 
@@ -63,6 +65,8 @@ npm run build
 npm start
 ```
 
+The server will start on port 3000 by default (configurable via PORT environment variable).
+
 ### MCP Client Configuration
 
 Add this server to your MCP client configuration:
@@ -71,9 +75,8 @@ Add this server to your MCP client configuration:
 {
   "servers": {
     "cloud-storage": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["dist/index.js"]
+      "type": "http",
+      "url": "http://localhost:3000"
     }
   }
 }
@@ -85,9 +88,8 @@ For VS Code with the MCP extension, add to `.vscode/mcp.json`:
 {
   "servers": {
     "cloud-storage": {
-      "type": "stdio", 
-      "command": "node",
-      "args": ["dist/index.js"]
+      "type": "http", 
+      "url": "http://localhost:3000"
     }
   }
 }
@@ -96,7 +98,7 @@ For VS Code with the MCP extension, add to `.vscode/mcp.json`:
 ## Available Tools
 
 ### 1. Upload File
-Upload a file to cloud storage and get its accessible URL.
+Upload a file to cloud storage and get its accessible URL. Optionally generate a signed download URL.
 
 ```json
 {
@@ -107,8 +109,28 @@ Upload a file to cloud storage and get its accessible URL.
     "contentType": "image/jpeg",
     "metadata": {
       "uploadedBy": "user123"
-    }
+    },
+    "generateDownloadUrl": true,
+    "downloadUrlExpiration": 3600
   }
+}
+```
+
+Response includes both public URL and optional signed download URL:
+```json
+{
+  "success": true,
+  "url": "https://your-bucket.s3.amazonaws.com/uploads/2024-01-01/uuid.jpg",
+  "filename": "uploads/2024-01-01/uuid.jpg",
+  "size": 12345,
+  "contentType": "image/jpeg",
+  "metadata": {
+    "backend": "AWS S3",
+    "bucket": "your-bucket",
+    "key": "uploads/2024-01-01/uuid.jpg"
+  },
+  "downloadUrl": "https://your-bucket.s3.amazonaws.com/uploads/2024-01-01/uuid.jpg?X-Amz-Algorithm=...",
+  "downloadUrlExpiration": 3600
 }
 ```
 
@@ -120,19 +142,6 @@ Delete a file from cloud storage.
   "tool": "delete_file", 
   "arguments": {
     "url": "https://your-bucket.s3.amazonaws.com/uploads/file.jpg"
-  }
-}
-```
-
-### 3. Generate Download URL
-Generate a signed download URL for private files.
-
-```json
-{
-  "tool": "get_download_url",
-  "arguments": {
-    "key": "uploads/2024-01-01/file.jpg",
-    "expirationTime": 3600
   }
 }
 ```
@@ -164,6 +173,8 @@ Optional:
 ```bash
 AWS_S3_ENDPOINT=https://s3.amazonaws.com
 ```
+
+**Note**: This version uses AWS SDK v3 for better performance and smaller bundle size.
 
 ### Qiniu Cloud Storage
 
@@ -211,7 +222,32 @@ URL_PREFIX=https://cdn.yourdomain.com/
 
 # Path to JSON config file (alternative to env vars)
 CONFIG_FILE=./config.json
+
+# Server port (default: 3000)
+PORT=3000
 ```
+
+## Key Changes in This Version
+
+### 1. AWS SDK v3 Migration
+- Upgraded from AWS SDK v2 to v3 for better performance
+- Smaller bundle size and modular imports
+- Improved TypeScript support
+
+### 2. HTTP Transport
+- Migrated from stdio transport to StreamableHTTPServerTransport
+- Better scalability and performance
+- Support for HTTP requests and responses
+
+### 3. Stateless Operation
+- No session management for better horizontal scaling
+- Each request is independent
+- Simplified deployment and maintenance
+
+### 4. Integrated Download URLs
+- Removed separate `get_download_url` tool
+- Download URL generation integrated into `upload_file` tool
+- Optional parameter to generate signed URLs during upload
 
 ## Development
 

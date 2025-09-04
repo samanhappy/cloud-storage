@@ -1,26 +1,28 @@
-import AWS from 'aws-sdk';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, PutObjectCommandInput, DeleteObjectCommandInput } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { StorageBackend, UploadResult, S3Config } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export class S3Backend implements StorageBackend {
   public readonly name = 'AWS S3';
-  private s3: AWS.S3;
+  private s3Client: S3Client;
   private bucket: string;
 
   constructor(private config: S3Config) {
     this.bucket = config.bucket;
     
-    // Configure AWS
-    AWS.config.update({
-      accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey,
+    // Create S3 client with v3 SDK
+    this.s3Client = new S3Client({
       region: config.region,
-    });
-
-    // Create S3 instance
-    this.s3 = new AWS.S3({
-      endpoint: config.endpoint,
-      s3ForcePathStyle: !!config.endpoint, // Use path-style URLs for custom endpoints
+      credentials: {
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
+      },
+      ...(config.endpoint && {
+        endpoint: config.endpoint,
+        forcePathStyle: true,
+      }),
     });
   }
 
@@ -29,7 +31,7 @@ export class S3Backend implements StorageBackend {
       // Generate unique key
       const key = this.generateKey(filename);
       
-      const uploadParams: AWS.S3.PutObjectRequest = {
+      const uploadParams: PutObjectCommandInput = {
         Bucket: this.bucket,
         Key: key,
         Body: file,
@@ -38,10 +40,15 @@ export class S3Backend implements StorageBackend {
         ACL: 'public-read',
       };
 
-      const result = await this.s3.upload(uploadParams).promise();
+      const command = new PutObjectCommand(uploadParams);
+      await this.s3Client.send(command);
+      
+      // Construct the public URL
+      const baseUrl = this.config.endpoint || `https://${this.bucket}.s3.${this.config.region}.amazonaws.com`;
+      const url = `${baseUrl}/${key}`;
       
       return {
-        url: result.Location,
+        url,
         filename: key,
         size: file.length,
         contentType,
@@ -61,12 +68,13 @@ export class S3Backend implements StorageBackend {
       // Extract key from URL
       const key = this.extractKeyFromUrl(url);
       
-      const deleteParams: AWS.S3.DeleteObjectRequest = {
+      const deleteParams: DeleteObjectCommandInput = {
         Bucket: this.bucket,
         Key: key,
       };
 
-      await this.s3.deleteObject(deleteParams).promise();
+      const command = new DeleteObjectCommand(deleteParams);
+      await this.s3Client.send(command);
     } catch (error) {
       throw new Error(`S3 delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -74,13 +82,12 @@ export class S3Backend implements StorageBackend {
 
   async getDownloadUrl(key: string, expirationTime = 3600): Promise<string> {
     try {
-      const params = {
+      const command = new GetObjectCommand({
         Bucket: this.bucket,
         Key: key,
-        Expires: expirationTime,
-      };
+      });
 
-      return this.s3.getSignedUrl('getObject', params);
+      return await getSignedUrl(this.s3Client, command, { expiresIn: expirationTime });
     } catch (error) {
       throw new Error(`Failed to generate download URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
