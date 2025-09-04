@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+config.json
+*.log
+.DS_Store
+.vscode/settings.json
+*.tgz
+coverage/
+.nyc_output/
+temp/
+tmp/

@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "cloud-storage": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["dist/index.js"]
+    }
+  }
+}

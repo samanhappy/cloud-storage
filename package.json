@@ -1,0 +1,43 @@
+{
+  "name": "cloud-storage-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for cloud storage file uploads with multi-backend support",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "cloud-storage-mcp-server": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "watch": "tsx watch src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "mcp",
+    "cloud-storage",
+    "s3",
+    "qiniu",
+    "alibaba-cloud",
+    "file-upload"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.5",
+    "ali-oss": "^6.23.0",
+    "aws-sdk": "^2.1692.0",
+    "qiniu": "^7.14.0",
+    "uuid": "^11.1.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/ali-oss": "^6.16.11",
+    "@types/aws-sdk": "^0.0.42",
+    "@types/node": "^24.3.1",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

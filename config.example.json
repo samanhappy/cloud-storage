@@ -1,0 +1,19 @@
+{
+  "backend": {
+    "type": "aws-s3",
+    "accessKeyId": "your-aws-access-key-id",
+    "secretAccessKey": "your-aws-secret-access-key",
+    "region": "us-east-1",
+    "bucket": "your-s3-bucket-name"
+  },
+  "maxFileSize": 10485760,
+  "allowedMimeTypes": [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "application/pdf",
+    "text/plain"
+  ],
+  "urlPrefix": "https://cdn.yourdomain.com/"
+}
