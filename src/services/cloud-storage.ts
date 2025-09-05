@@ -32,11 +32,6 @@ export class CloudStorageService {
       // Upload to the backend
       const result = await this.backend.upload(file, filename, contentType);
 
-      // Add URL prefix if configured
-      if (this.config.urlPrefix && result.url) {
-        result.url = this.config.urlPrefix + result.url;
-      }
-
       // Merge additional metadata
       if (options.metadata) {
         result.metadata = {
@@ -58,10 +53,6 @@ export class CloudStorageService {
     try {
       // Remove URL prefix if configured
       let cleanUrl = url;
-      if (this.config.urlPrefix && url.startsWith(this.config.urlPrefix)) {
-        cleanUrl = url.substring(this.config.urlPrefix.length);
-      }
-
       if (this.backend.delete) {
         await this.backend.delete(cleanUrl);
       } else {
@@ -78,14 +69,7 @@ export class CloudStorageService {
   async getDownloadUrl(key: string, expirationTime?: number): Promise<string> {
     try {
       if (this.backend.getDownloadUrl) {
-        const url = await this.backend.getDownloadUrl(key, expirationTime);
-        
-        // Add URL prefix if configured
-        if (this.config.urlPrefix) {
-          return this.config.urlPrefix + url;
-        }
-        
-        return url;
+        return await this.backend.getDownloadUrl(key, expirationTime);
       } else {
         throw new Error(`Download URL generation not supported by ${this.backend.name}`);
       }
@@ -112,7 +96,6 @@ export class CloudStorageService {
       backend: this.config.backend.type,
       maxFileSize: this.config.maxFileSize,
       allowedMimeTypes: this.config.allowedMimeTypes,
-      urlPrefix: this.config.urlPrefix,
     };
   }
 }

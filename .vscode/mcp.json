@@ -1,9 +1,8 @@
 {
   "servers": {
     "cloud-storage": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["dist/index.js"]
+      "type": "http",
+      "url": "http://localhost:3000"
     }
   }
 }

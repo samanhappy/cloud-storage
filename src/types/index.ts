@@ -22,7 +22,6 @@ export interface CloudStorageConfig {
   backend: BackendConfig;
   maxFileSize?: number;
   allowedMimeTypes?: string[];
-  urlPrefix?: string;
   expirationTime?: number; // Download URL expiration time in seconds, default 1 hour
 }
 

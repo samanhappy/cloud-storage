@@ -49,7 +49,6 @@ class CloudStorageMCPServer {
       }) => {
         try {
           const storageService = this.getStorageService();
-          const config = this.configManager.load();
 
           // Decode base64 file data
           const fileBuffer = Buffer.from(fileData, 'base64');
@@ -60,32 +59,10 @@ class CloudStorageMCPServer {
             metadata,
           });
 
-          // Always generate download URL using config expiration time
-          let downloadUrl: string | undefined;
-          if (result.metadata?.key) {
-            try {
-              downloadUrl = await storageService.getDownloadUrl(
-                result.metadata.key, 
-                config.expirationTime || 3600
-              );
-            } catch (error) {
-              console.warn('Failed to generate download URL:', error);
-            }
-          }
-
           const response: any = {
             success: true,
             url: result.url,
-            filename: result.filename,
-            size: result.size,
-            contentType: result.contentType,
-            metadata: result.metadata,
           };
-
-          if (downloadUrl) {
-            response.downloadUrl = downloadUrl;
-            response.downloadUrlExpiration = config.expirationTime || 3600;
-          }
 
           return {
             content: [

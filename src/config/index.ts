@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { CloudStorageConfig, S3Config, QiniuConfig, AlibabaOSSConfig } from '../types/index.js';
 import * as fs from 'fs';
-import * as path from 'path';
+import dotenv from "dotenv";
+
+dotenv.config();
 
 // Zod schemas for validation
 const S3ConfigSchema = z.object({

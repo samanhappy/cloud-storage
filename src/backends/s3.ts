@@ -37,7 +37,7 @@ export class S3Backend implements StorageBackend {
         Body: file,
         ContentType: contentType || 'application/octet-stream',
         // Make file publicly readable by default
-        ACL: 'public-read',
+        // ACL: 'public-read',
       };
 
       const command = new PutObjectCommand(uploadParams);
