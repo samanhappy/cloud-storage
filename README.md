@@ -119,10 +119,7 @@ Upload a file to cloud storage and automatically get both its public URL and a s
   "arguments": {
     "fileData": "base64-encoded-file-content",
     "filename": "example.jpg",
-    "contentType": "image/jpeg",
-    "metadata": {
-      "uploadedBy": "user123"
-    }
+    "contentType": "image/jpeg"
   }
 }
 ```
@@ -131,17 +128,7 @@ Response includes both public URL and signed download URL:
 ```json
 {
   "success": true,
-  "url": "https://cdn.example.com/my-app/uploads/2024-01-01/uuid.jpg",
-  "filename": "my-app/uploads/2024-01-01/uuid.jpg",
-  "size": 12345,
-  "contentType": "image/jpeg",
-  "metadata": {
-    "backend": "AWS S3",
-    "bucket": "your-bucket",
-    "key": "my-app/uploads/2024-01-01/uuid.jpg"
-  },
-  "downloadUrl": "https://your-bucket.s3.amazonaws.com/my-app/uploads/2024-01-01/uuid.jpg?X-Amz-Algorithm=...",
-  "downloadUrlExpiration": 3600
+  "url": "https://cdn.example.com/my-app/uploads/2024-01-01/uuid.jpg"
 }
 ```
 
