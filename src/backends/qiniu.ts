@@ -1,46 +1,73 @@
-import * as qiniu from 'qiniu';
+import qiniu from 'qiniu';
 import { StorageBackend, UploadResult, QiniuConfig } from '../types/index.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export class QiniuBackend implements StorageBackend {
   public readonly name = 'Qiniu Cloud Storage';
-  private config: qiniu.conf.Config;
-  private bucketManager: qiniu.rs.BucketManager;
-  private formUploader: qiniu.form_up.FormUploader;
-  private putPolicy: qiniu.rs.PutPolicy;
+  private config: any;
+  private bucketManager: any;
+  private formUploader: any;
+  private putPolicy: any;
+  private mac: any;
 
   constructor(private qiniuConfig: QiniuConfig) {
-    // Configure Qiniu
-    const mac = new qiniu.auth.digest.Mac(qiniuConfig.accessKey, qiniuConfig.secretKey);
-    
-    this.config = new qiniu.conf.Config();
-    // Set zone if provided
-    if (qiniuConfig.zone) {
-      const zoneMap: Record<string, any> = {
-        'z0': qiniu.zone.Zone_z0, // 华东
-        'z1': qiniu.zone.Zone_z1, // 华北
-        'z2': qiniu.zone.Zone_z2, // 华南
-        'na0': qiniu.zone.Zone_na0, // 北美
-        'as0': qiniu.zone.Zone_as0, // 东南亚
-      };
-      this.config.zone = zoneMap[qiniuConfig.zone] || qiniu.zone.Zone_z0;
+    // Validate required configuration
+    if (!qiniuConfig.accessKey || !qiniuConfig.secretKey) {
+      throw new Error('Qiniu access key and secret key are required');
     }
+    if (!qiniuConfig.bucket) {
+      throw new Error('Qiniu bucket is required');
+    }
+    if (!qiniuConfig.domain) {
+      throw new Error('Qiniu domain is required');
+    }
+    
+    try {
+      // Configure Qiniu with CommonJS compatibility
+      const Mac = qiniu.auth?.digest?.Mac || (qiniu as any).auth?.digest?.Mac;
+      const Config = qiniu.conf?.Config || (qiniu as any).conf?.Config;
+      const BucketManager = qiniu.rs?.BucketManager || (qiniu as any).rs?.BucketManager;
+      const FormUploader = qiniu.form_up?.FormUploader || (qiniu as any).form_up?.FormUploader;
+      const PutPolicy = qiniu.rs?.PutPolicy || (qiniu as any).rs?.PutPolicy;
+      
+      if (!Mac || !Config || !BucketManager || !FormUploader || !PutPolicy) {
+        throw new Error('Failed to load Qiniu SDK components');
+      }
 
-    this.bucketManager = new qiniu.rs.BucketManager(mac, this.config);
-    this.formUploader = new qiniu.form_up.FormUploader(this.config);
-    this.putPolicy = new qiniu.rs.PutPolicy({
-      scope: qiniuConfig.bucket,
-    });
-    this.putPolicy.returnBody = '{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)"}';
+      this.mac = new Mac(qiniuConfig.accessKey, qiniuConfig.secretKey);
+      
+      this.config = new Config();
+      // Set zone if provided
+      if (qiniuConfig.zone) {
+        const zones = qiniu.zone || (qiniu as any).zone;
+        const zoneMap: Record<string, any> = {
+          'z0': zones.Zone_z0, // 华东
+          'z1': zones.Zone_z1, // 华北
+          'z2': zones.Zone_z2, // 华南
+          'na0': zones.Zone_na0, // 北美
+          'as0': zones.Zone_as0, // 东南亚
+        };
+        this.config.zone = zoneMap[qiniuConfig.zone] || zones.Zone_z0;
+      }
+
+      this.bucketManager = new BucketManager(this.mac, this.config);
+      this.formUploader = new FormUploader(this.config);
+      this.putPolicy = new PutPolicy({
+        scope: qiniuConfig.bucket,
+      });
+      this.putPolicy.returnBody = '{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)"}';
+    } catch (error) {
+      throw new Error(`Failed to initialize Qiniu backend: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async upload(file: Buffer, filename: string, contentType?: string): Promise<UploadResult> {
     try {
       const key = this.generateKey(filename);
-      const mac = new qiniu.auth.digest.Mac(this.qiniuConfig.accessKey, this.qiniuConfig.secretKey);
-      const uploadToken = this.putPolicy.uploadToken(mac);
+      const uploadToken = this.putPolicy.uploadToken(this.mac);
 
-      const putExtra = new qiniu.form_up.PutExtra();
+      const PutExtra = qiniu.form_up?.PutExtra || (qiniu as any).form_up?.PutExtra;
+      const putExtra = new PutExtra();
       if (contentType) {
         putExtra.mimeType = contentType;
       }

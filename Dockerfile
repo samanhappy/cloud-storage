@@ -10,14 +10,17 @@ RUN npm install -g pnpm
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile --production
+# Install all dependencies (including dev dependencies for build)
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY . .
 
 # Build the application
 RUN pnpm run build
+
+# Remove dev dependencies after build to reduce image size
+RUN pnpm prune --production
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
