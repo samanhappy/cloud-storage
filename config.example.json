@@ -4,7 +4,9 @@
     "accessKeyId": "your-aws-access-key-id",
     "secretAccessKey": "your-aws-secret-access-key",
     "region": "us-east-1",
-    "bucket": "your-s3-bucket-name"
+    "bucket": "your-s3-bucket-name",
+    "prefix": "my-app",
+    "cdn": "https://cdn.yourdomain.com"
   },
   "maxFileSize": 10485760,
   "allowedMimeTypes": [
@@ -15,5 +17,6 @@
     "application/pdf",
     "text/plain"
   ],
-  "urlPrefix": "https://cdn.yourdomain.com/"
+  "urlPrefix": "https://cdn.yourdomain.com/",
+  "expirationTime": 3600
 }

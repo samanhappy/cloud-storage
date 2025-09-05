@@ -9,8 +9,11 @@ A Model Context Protocol (MCP) server that provides file upload functionality wi
 - **Flexible Configuration**: Environment variables or JSON config file
 - **HTTP Transport**: Streamable HTTP transport for better performance and scalability
 - **Stateless Operation**: No session management for better scalability
-- **Integrated Download URLs**: Generate signed download URLs directly from upload
+- **Automatic Download URLs**: Generate signed download URLs automatically for every upload
+- **CDN Support**: Optional CDN configuration for faster file access
+- **Path Prefix**: Configurable path prefix for organized file storage
 - **Type Safety**: Built with TypeScript and Zod validation
+- **Docker Support**: Container-ready with health checks and multi-stage builds
 
 ## Supported Storage Backends
 
@@ -18,87 +21,97 @@ A Model Context Protocol (MCP) server that provides file upload functionality wi
 2. **Qiniu Cloud Storage** - Popular Chinese cloud storage service
 3. **Alibaba Cloud OSS** - Alibaba's object storage service
 
-## Installation
+## Quick Start
+
+### Local Development
 
 ```bash
-npm install
-npm run build
+# Install dependencies
+pnpm install
+
+# Copy and configure environment
+cp .env.example .env
+# Edit .env with your cloud storage credentials
+
+# Start development server
+pnpm dev
+```
+
+### Docker Deployment
+
+```bash
+# Build and run with Docker Compose
+docker-compose up -d
+
+# Or build and run manually
+docker build -t cloud-storage-mcp .
+docker run -p 3000:3000 --env-file .env cloud-storage-mcp
 ```
 
 ## Configuration
 
-### Option 1: Environment Variables
+### Environment Variables
 
-Copy `.env.example` to `.env` and configure your storage backend:
-
-```bash
-cp .env.example .env
-```
-
-Example for AWS S3:
-```bash
-CLOUD_STORAGE_BACKEND=aws-s3
-AWS_ACCESS_KEY_ID=your-access-key
-AWS_SECRET_ACCESS_KEY=your-secret-key
-AWS_REGION=us-east-1
-AWS_S3_BUCKET=your-bucket-name
-```
-
-### Option 2: Configuration File
-
-Copy `config.example.json` to `config.json` and customize:
+Key configuration options:
 
 ```bash
-cp config.example.json config.json
+# MCP Server
+MCP_SERVER_PORT=3000
+
+# Backend Selection
+CLOUD_STORAGE_BACKEND=aws-s3  # aws-s3, qiniu, alibaba-oss
+
+# Common Settings
+EXPIRATION_TIME=3600          # Download URL expiration (seconds)
+MAX_FILE_SIZE=10485760        # Max file size (bytes)
+
+# AWS S3 with CDN and prefix example
+AWS_ACCESS_KEY_ID=your-key
+AWS_SECRET_ACCESS_KEY=your-secret
+AWS_S3_BUCKET=my-bucket
+AWS_S3_PREFIX=my-app          # Files saved under my-app/uploads/...
+AWS_S3_CDN=https://cdn.example.com  # Use CDN for faster access
+
+# Qiniu with CDN and prefix
+QINIU_ACCESS_KEY=your-key
+QINIU_SECRET_KEY=your-secret
+QINIU_BUCKET=my-bucket
+QINIU_DOMAIN=files.example.com
+QINIU_PREFIX=my-app
+QINIU_CDN=https://cdn.example.com
+
+# Alibaba OSS with CDN and prefix
+ALIBABA_ACCESS_KEY_ID=your-key
+ALIBABA_ACCESS_KEY_SECRET=your-secret
+ALIBABA_OSS_BUCKET=my-bucket
+ALIBABA_OSS_REGION=oss-cn-hangzhou
+ALIBABA_OSS_PREFIX=my-app
+ALIBABA_OSS_CDN=https://cdn.example.com
 ```
 
-## Usage
+### Configuration File
 
-### Running the Server
-
-```bash
-# Development mode
-npm run dev
-
-# Production mode
-npm run build
-npm start
-```
-
-The server will start on port 3000 by default (configurable via PORT environment variable).
-
-### MCP Client Configuration
-
-Add this server to your MCP client configuration:
+Alternatively, use a JSON configuration file:
 
 ```json
 {
-  "servers": {
-    "cloud-storage": {
-      "type": "http",
-      "url": "http://localhost:3000"
-    }
-  }
+  "backend": {
+    "type": "aws-s3",
+    "accessKeyId": "your-key",
+    "secretAccessKey": "your-secret",
+    "region": "us-east-1",
+    "bucket": "my-bucket",
+    "prefix": "my-app",
+    "cdn": "https://cdn.example.com"
+  },
+  "expirationTime": 3600,
+  "maxFileSize": 10485760
 }
 ```
-
-For VS Code with the MCP extension, add to `.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "cloud-storage": {
-      "type": "http", 
-      "url": "http://localhost:3000"
-    }
-  }
-}
-```
-
 ## Available Tools
 
 ### 1. Upload File
-Upload a file to cloud storage and get its accessible URL. Optionally generate a signed download URL.
+Upload a file to cloud storage and automatically get both its public URL and a signed download URL.
 
 ```json
 {
@@ -109,27 +122,25 @@ Upload a file to cloud storage and get its accessible URL. Optionally generate a
     "contentType": "image/jpeg",
     "metadata": {
       "uploadedBy": "user123"
-    },
-    "generateDownloadUrl": true,
-    "downloadUrlExpiration": 3600
+    }
   }
 }
 ```
 
-Response includes both public URL and optional signed download URL:
+Response includes both public URL and signed download URL:
 ```json
 {
   "success": true,
-  "url": "https://your-bucket.s3.amazonaws.com/uploads/2024-01-01/uuid.jpg",
-  "filename": "uploads/2024-01-01/uuid.jpg",
+  "url": "https://cdn.example.com/my-app/uploads/2024-01-01/uuid.jpg",
+  "filename": "my-app/uploads/2024-01-01/uuid.jpg",
   "size": 12345,
   "contentType": "image/jpeg",
   "metadata": {
     "backend": "AWS S3",
     "bucket": "your-bucket",
-    "key": "uploads/2024-01-01/uuid.jpg"
+    "key": "my-app/uploads/2024-01-01/uuid.jpg"
   },
-  "downloadUrl": "https://your-bucket.s3.amazonaws.com/uploads/2024-01-01/uuid.jpg?X-Amz-Algorithm=...",
+  "downloadUrl": "https://your-bucket.s3.amazonaws.com/my-app/uploads/2024-01-01/uuid.jpg?X-Amz-Algorithm=...",
   "downloadUrlExpiration": 3600
 }
 ```
@@ -141,7 +152,7 @@ Delete a file from cloud storage.
 {
   "tool": "delete_file", 
   "arguments": {
-    "url": "https://your-bucket.s3.amazonaws.com/uploads/file.jpg"
+    "url": "https://cdn.example.com/my-app/uploads/file.jpg"
   }
 }
 ```
@@ -208,6 +219,52 @@ Optional:
 ALIBABA_OSS_ENDPOINT=https://oss-cn-beijing.aliyuncs.com
 ```
 
+## Docker Deployment
+
+### Using Docker Compose (Recommended)
+
+1. Copy environment configuration:
+```bash
+cp .env.example .env
+# Edit .env with your cloud storage credentials
+```
+
+2. Start the service:
+```bash
+docker-compose up -d
+```
+
+3. Check service health:
+```bash
+curl http://localhost:3000/health
+```
+
+### Manual Docker Build
+
+```bash
+# Build the image
+docker build -t cloud-storage-mcp .
+
+# Run with environment file
+docker run -p 3000:3000 --env-file .env cloud-storage-mcp
+
+# Or run with individual environment variables
+docker run -p 3000:3000 \
+  -e CLOUD_STORAGE_BACKEND=aws-s3 \
+  -e AWS_ACCESS_KEY_ID=your-key \
+  -e AWS_SECRET_ACCESS_KEY=your-secret \
+  -e AWS_S3_BUCKET=your-bucket \
+  cloud-storage-mcp
+```
+
+### Docker Features
+
+- **Multi-stage build** for optimal image size
+- **Non-root user** for security
+- **Health checks** for monitoring
+- **Port exposure** on 3000
+- **Production optimizations**
+
 ## Optional Configuration
 
 ```bash
@@ -220,11 +277,14 @@ ALLOWED_MIME_TYPES=image/jpeg,image/png,application/pdf
 # URL prefix for returned URLs
 URL_PREFIX=https://cdn.yourdomain.com/
 
+# Download URL expiration time in seconds (default: 1 hour)
+EXPIRATION_TIME=3600
+
 # Path to JSON config file (alternative to env vars)
 CONFIG_FILE=./config.json
 
 # Server port (default: 3000)
-PORT=3000
+MCP_SERVER_PORT=3000
 ```
 
 ## Key Changes in This Version
@@ -244,10 +304,15 @@ PORT=3000
 - Each request is independent
 - Simplified deployment and maintenance
 
-### 4. Integrated Download URLs
-- Removed separate `get_download_url` tool
-- Download URL generation integrated into `upload_file` tool
-- Optional parameter to generate signed URLs during upload
+### 4. Automatic Download URLs
+- Always generate signed download URLs for uploaded files
+- Expiration time configurable via environment variable
+- No separate tool needed for URL generation
+
+### 5. CDN and Prefix Support
+- Optional CDN configuration for faster file access
+- Configurable path prefix for organized storage
+- Per-backend CDN and prefix settings
 
 ## Development
 

@@ -32,8 +32,11 @@ export class AlibabaOSSBackend implements StorageBackend {
 
       const result = await this.client.put(key, file, options);
       
+      // Use CDN URL if configured, otherwise use the default URL
+      const url = this.config.cdn ? `${this.config.cdn.replace(/\/$/, '')}/${key}` : result.url;
+      
       return {
-        url: result.url,
+        url,
         filename: key,
         size: file.length,
         contentType,
@@ -74,7 +77,10 @@ export class AlibabaOSSBackend implements StorageBackend {
     const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const uuid = uuidv4();
     const extension = filename.split('.').pop();
-    return `uploads/${timestamp}/${uuid}.${extension}`;
+    const baseKey = `uploads/${timestamp}/${uuid}.${extension}`;
+    
+    // Add prefix if configured
+    return this.config.prefix ? `${this.config.prefix.replace(/\/$/, '')}/${baseKey}` : baseKey;
   }
 
   private extractKeyFromUrl(url: string): string {

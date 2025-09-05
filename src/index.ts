@@ -13,8 +13,6 @@ const UploadFileInputSchema = {
   filename: z.string().describe('Name of the file to upload'),
   contentType: z.string().optional().describe('MIME type of the file (optional, will be auto-detected)'),
   metadata: z.record(z.string()).optional().describe('Additional metadata for the file'),
-  generateDownloadUrl: z.boolean().optional().describe('Whether to generate a signed download URL (default: false)'),
-  downloadUrlExpiration: z.number().optional().describe('Download URL expiration time in seconds (default: 3600)'),
 };
 
 const DeleteFileInputSchema = {
@@ -35,24 +33,23 @@ class CloudStorageMCPServer {
   }
 
   private setupTools(server: McpServer) {
-    // Upload file tool with integrated download URL generation
+    // Upload file tool with automatic download URL generation
     server.registerTool(
       'upload_file',
       {
         title: 'Upload File to Cloud Storage',
-        description: 'Upload a file to the configured cloud storage backend and return its accessible URL. Optionally generate a signed download URL.',
+        description: 'Upload a file to the configured cloud storage backend and automatically return its accessible URL with download URL.',
         inputSchema: UploadFileInputSchema,
       },
-      async ({ fileData, filename, contentType, metadata, generateDownloadUrl, downloadUrlExpiration }: {
+      async ({ fileData, filename, contentType, metadata }: {
         fileData: string;
         filename: string;
         contentType?: string;
         metadata?: Record<string, string>;
-        generateDownloadUrl?: boolean;
-        downloadUrlExpiration?: number;
       }) => {
         try {
           const storageService = this.getStorageService();
+          const config = this.configManager.load();
 
           // Decode base64 file data
           const fileBuffer = Buffer.from(fileData, 'base64');
@@ -63,13 +60,13 @@ class CloudStorageMCPServer {
             metadata,
           });
 
-          // Generate download URL if requested
+          // Always generate download URL using config expiration time
           let downloadUrl: string | undefined;
-          if (generateDownloadUrl && result.metadata?.key) {
+          if (result.metadata?.key) {
             try {
               downloadUrl = await storageService.getDownloadUrl(
                 result.metadata.key, 
-                downloadUrlExpiration || 3600
+                config.expirationTime || 3600
               );
             } catch (error) {
               console.warn('Failed to generate download URL:', error);
@@ -87,7 +84,7 @@ class CloudStorageMCPServer {
 
           if (downloadUrl) {
             response.downloadUrl = downloadUrl;
-            response.downloadUrlExpiration = downloadUrlExpiration || 3600;
+            response.downloadUrlExpiration = config.expirationTime || 3600;
           }
 
           return {
@@ -343,6 +340,17 @@ export ALIBABA_OSS_REGION=oss-cn-beijing
         return;
       }
 
+      // Health check endpoint
+      if (req.url === '/health' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          status: 'healthy', 
+          timestamp: new Date().toISOString(),
+          service: 'cloud-storage-mcp-server' 
+        }));
+        return;
+      }
+
       // Handle MCP requests
       if (req.method === 'POST') {
         let body = '';
@@ -372,7 +380,7 @@ export ALIBABA_OSS_REGION=oss-cn-beijing
 }
 
 // Start the server
-if (import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {
+if (import.meta.url.endsWith((process.argv[1] || '').replace(/\\/g, '/'))) {
   console.error('Starting server...');
   const server = new CloudStorageMCPServer();
   server.start().catch((error) => {

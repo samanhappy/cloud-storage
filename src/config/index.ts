@@ -11,6 +11,8 @@ const S3ConfigSchema = z.object({
   region: z.string(),
   bucket: z.string(),
   endpoint: z.string().optional(),
+  prefix: z.string().optional(),
+  cdn: z.string().optional(),
 });
 
 const QiniuConfigSchema = z.object({
@@ -20,6 +22,8 @@ const QiniuConfigSchema = z.object({
   bucket: z.string(),
   domain: z.string(),
   zone: z.string().optional(),
+  prefix: z.string().optional(),
+  cdn: z.string().optional(),
 });
 
 const AlibabaOSSConfigSchema = z.object({
@@ -29,6 +33,8 @@ const AlibabaOSSConfigSchema = z.object({
   bucket: z.string(),
   region: z.string(),
   endpoint: z.string().optional(),
+  prefix: z.string().optional(),
+  cdn: z.string().optional(),
 });
 
 const BackendConfigSchema = z.discriminatedUnion('type', [
@@ -42,6 +48,7 @@ const CloudStorageConfigSchema = z.object({
   maxFileSize: z.number().positive().optional().default(10 * 1024 * 1024), // 10MB default
   allowedMimeTypes: z.array(z.string()).optional(),
   urlPrefix: z.string().optional(),
+  expirationTime: z.number().positive().optional().default(3600), // 1 hour default
 });
 
 export class ConfigManager {
@@ -68,6 +75,8 @@ export class ConfigManager {
           region: process.env.AWS_REGION || 'us-east-1',
           bucket: process.env.AWS_S3_BUCKET || '',
           endpoint: process.env.AWS_S3_ENDPOINT,
+          prefix: process.env.AWS_S3_PREFIX,
+          cdn: process.env.AWS_S3_CDN,
         };
         break;
 
@@ -79,6 +88,8 @@ export class ConfigManager {
           bucket: process.env.QINIU_BUCKET || '',
           domain: process.env.QINIU_DOMAIN || '',
           zone: process.env.QINIU_ZONE,
+          prefix: process.env.QINIU_PREFIX,
+          cdn: process.env.QINIU_CDN,
         };
         break;
 
@@ -90,6 +101,8 @@ export class ConfigManager {
           bucket: process.env.ALIBABA_OSS_BUCKET || '',
           region: process.env.ALIBABA_OSS_REGION || '',
           endpoint: process.env.ALIBABA_OSS_ENDPOINT,
+          prefix: process.env.ALIBABA_OSS_PREFIX,
+          cdn: process.env.ALIBABA_OSS_CDN,
         };
         break;
 
@@ -102,6 +115,7 @@ export class ConfigManager {
       maxFileSize: process.env.MAX_FILE_SIZE ? parseInt(process.env.MAX_FILE_SIZE) : undefined,
       allowedMimeTypes: process.env.ALLOWED_MIME_TYPES ? process.env.ALLOWED_MIME_TYPES.split(',') : undefined,
       urlPrefix: process.env.URL_PREFIX,
+      expirationTime: process.env.EXPIRATION_TIME ? parseInt(process.env.EXPIRATION_TIME) : undefined,
     };
 
     this.config = CloudStorageConfigSchema.parse(config);

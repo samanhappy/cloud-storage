@@ -62,7 +62,8 @@ export class QiniuBackend implements StorageBackend {
               return;
             }
 
-            const url = `${this.qiniuConfig.domain}/${key}`;
+            const baseUrl = this.qiniuConfig.cdn || this.qiniuConfig.domain;
+            const url = `${baseUrl}/${key}`;
             resolve({
               url,
               filename: key,
@@ -114,8 +115,9 @@ export class QiniuBackend implements StorageBackend {
 
   async getDownloadUrl(key: string, expirationTime = 3600): Promise<string> {
     try {
-      // For public bucket, return direct URL
-      const publicUrl = `${this.qiniuConfig.domain}/${key}`;
+      // Use CDN URL if configured, otherwise use domain
+      const baseUrl = this.qiniuConfig.cdn || this.qiniuConfig.domain;
+      const publicUrl = `${baseUrl}/${key}`;
       
       // For private bucket, you would need to generate signed URL
       // This is a simplified implementation - in production you may need
@@ -130,7 +132,10 @@ export class QiniuBackend implements StorageBackend {
     const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const uuid = uuidv4();
     const extension = filename.split('.').pop();
-    return `uploads/${timestamp}/${uuid}.${extension}`;
+    const baseKey = `uploads/${timestamp}/${uuid}.${extension}`;
+    
+    // Add prefix if configured
+    return this.qiniuConfig.prefix ? `${this.qiniuConfig.prefix.replace(/\/$/, '')}/${baseKey}` : baseKey;
   }
 
   private extractKeyFromUrl(url: string): string {

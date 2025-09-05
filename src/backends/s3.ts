@@ -28,7 +28,7 @@ export class S3Backend implements StorageBackend {
 
   async upload(file: Buffer, filename: string, contentType?: string): Promise<UploadResult> {
     try {
-      // Generate unique key
+      // Generate unique key with optional prefix
       const key = this.generateKey(filename);
       
       const uploadParams: PutObjectCommandInput = {
@@ -43,9 +43,16 @@ export class S3Backend implements StorageBackend {
       const command = new PutObjectCommand(uploadParams);
       await this.s3Client.send(command);
       
-      // Construct the public URL
-      const baseUrl = this.config.endpoint || `https://${this.bucket}.s3.${this.config.region}.amazonaws.com`;
-      const url = `${baseUrl}/${key}`;
+      // Construct the public URL with CDN support
+      let url: string;
+      if (this.config.cdn) {
+        // Use CDN URL if configured
+        url = `${this.config.cdn.replace(/\/$/, '')}/${key}`;
+      } else {
+        // Use default S3 URL
+        const baseUrl = this.config.endpoint || `https://${this.bucket}.s3.${this.config.region}.amazonaws.com`;
+        url = `${baseUrl}/${key}`;
+      }
       
       return {
         url,
@@ -97,7 +104,10 @@ export class S3Backend implements StorageBackend {
     const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const uuid = uuidv4();
     const extension = filename.split('.').pop();
-    return `uploads/${timestamp}/${uuid}.${extension}`;
+    const baseKey = `uploads/${timestamp}/${uuid}.${extension}`;
+    
+    // Add prefix if configured
+    return this.config.prefix ? `${this.config.prefix.replace(/\/$/, '')}/${baseKey}` : baseKey;
   }
 
   private extractKeyFromUrl(url: string): string {

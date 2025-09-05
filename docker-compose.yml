@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  cloud-storage-mcp:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      # MCP Server Configuration
+      - MCP_SERVER_PORT=3000
+      
+      # Cloud Storage Backend Configuration
+      - CLOUD_STORAGE_BACKEND=aws-s3
+      
+      # AWS S3 Configuration (example)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - AWS_S3_ENDPOINT=${AWS_S3_ENDPOINT}
+      - AWS_S3_PREFIX=${AWS_S3_PREFIX}
+      - AWS_S3_CDN=${AWS_S3_CDN}
+      
+      # Qiniu Configuration (alternative)
+      # - QINIU_ACCESS_KEY=${QINIU_ACCESS_KEY}
+      # - QINIU_SECRET_KEY=${QINIU_SECRET_KEY}
+      # - QINIU_BUCKET=${QINIU_BUCKET}
+      # - QINIU_DOMAIN=${QINIU_DOMAIN}
+      # - QINIU_ZONE=${QINIU_ZONE}
+      # - QINIU_PREFIX=${QINIU_PREFIX}
+      # - QINIU_CDN=${QINIU_CDN}
+      
+      # Alibaba OSS Configuration (alternative)
+      # - ALIBABA_ACCESS_KEY_ID=${ALIBABA_ACCESS_KEY_ID}
+      # - ALIBABA_ACCESS_KEY_SECRET=${ALIBABA_ACCESS_KEY_SECRET}
+      # - ALIBABA_OSS_BUCKET=${ALIBABA_OSS_BUCKET}
+      # - ALIBABA_OSS_REGION=${ALIBABA_OSS_REGION}
+      # - ALIBABA_OSS_ENDPOINT=${ALIBABA_OSS_ENDPOINT}
+      # - ALIBABA_OSS_PREFIX=${ALIBABA_OSS_PREFIX}
+      # - ALIBABA_OSS_CDN=${ALIBABA_OSS_CDN}
+      
+      # Common Configuration
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-10485760}
+      - ALLOWED_MIME_TYPES=${ALLOWED_MIME_TYPES}
+      - URL_PREFIX=${URL_PREFIX}
+      - EXPIRATION_TIME=${EXPIRATION_TIME:-3600}
+    volumes:
+      # Mount config file if using file-based configuration
+      - ./config.json:/app/config.json:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

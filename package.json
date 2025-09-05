@@ -10,9 +10,17 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
+    "dev:check": "./scripts/dev.sh",
     "start": "node dist/index.js",
     "watch": "tsx watch src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "validate": "./scripts/validate.sh",
+    "health": "./scripts/health-check.sh",
+    "docker:build": "docker build -t cloud-storage-mcp .",
+    "docker:run": "docker run -p 3000:3000 --env-file .env cloud-storage-mcp",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f"
   },
   "keywords": [
     "mcp",

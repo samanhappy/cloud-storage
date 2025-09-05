@@ -23,6 +23,7 @@ export interface CloudStorageConfig {
   maxFileSize?: number;
   allowedMimeTypes?: string[];
   urlPrefix?: string;
+  expirationTime?: number; // Download URL expiration time in seconds, default 1 hour
 }
 
 export interface S3Config extends BackendConfig {
@@ -32,6 +33,8 @@ export interface S3Config extends BackendConfig {
   region: string;
   bucket: string;
   endpoint?: string;
+  prefix?: string; // Optional path prefix for bucket
+  cdn?: string; // Optional CDN URL for file access
 }
 
 export interface QiniuConfig extends BackendConfig {
@@ -41,6 +44,8 @@ export interface QiniuConfig extends BackendConfig {
   bucket: string;
   domain: string;
   zone?: string;
+  prefix?: string; // Optional path prefix for bucket
+  cdn?: string; // Optional CDN URL for file access
 }
 
 export interface AlibabaOSSConfig extends BackendConfig {
@@ -50,4 +55,6 @@ export interface AlibabaOSSConfig extends BackendConfig {
   bucket: string;
   region: string;
   endpoint?: string;
+  prefix?: string; // Optional path prefix for bucket
+  cdn?: string; // Optional CDN URL for file access
 }
